@@ -1,47 +1,112 @@
-const dino = document.getElementById('dino');
-const cactus = document.getElementById('cactus');
+const gameContainer = document.getElementById('game');
 const message = document.getElementById('message');
+const restartButton = document.getElementById('restartButton');
+const size = 10;
+const mineCount = 20;
+let grid = [];
+let isGameOver = false;
 
-let isJumping = false;
+function createBoard() {
+    grid = [];
+    gameContainer.innerHTML = '';
+    message.textContent = '';
+    isGameOver = false;
 
-document.addEventListener('keydown', function(event) {
-    if (event.code === 'Space' && !isJumping) {
-        jump();
-    }
-});
+    const mines = Array(mineCount).fill('mine').concat(Array(size * size - mineCount).fill('empty'));
+    const shuffledMines = mines.sort(() => Math.random() - 0.5);
 
-function jump() {
-    if (isJumping) return;
-    
-    isJumping = true;
-    let upInterval = setInterval(() => {
-        if (parseInt(window.getComputedStyle(dino).bottom) >= 150) {
-            clearInterval(upInterval);
-            let downInterval = setInterval(() => {
-                if (parseInt(window.getComputedStyle(dino).bottom) <= 0) {
-                    clearInterval(downInterval);
-                    isJumping = false;
-                } else {
-                    dino.style.bottom = parseInt(window.getComputedStyle(dino).bottom) - 5 + 'px';
-                }
-            }, 20);
-        } else {
-            dino.style.bottom = parseInt(window.getComputedStyle(dino).bottom) + 5 + 'px';
+    for (let i = 0; i < size; i++) {
+        const row = [];
+        for (let j = 0; j < size; j++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.setAttribute('data-mine', shuffledMines[i * size + j]);
+            cell.addEventListener('click', () => handleClick(cell, i, j));
+            gameContainer.appendChild(cell);
+            row.push(cell);
         }
-    }, 20);
-}
-
-function checkCollision() {
-    const dinoBottom = parseInt(window.getComputedStyle(dino).bottom);
-    const dinoLeft = parseInt(window.getComputedStyle(dino).left);
-    const cactusLeft = parseInt(window.getComputedStyle(cactus).right);
-
-    if (cactusLeft < (dinoLeft + 40) && cactusLeft > (dinoLeft - 20) && dinoBottom <= 40) {
-        message.textContent = 'Game Over';
-        cactus.style.animation = 'none';
-        cactus.style.right = cactusLeft + 'px';
-        clearInterval(collisionInterval);
+        grid.push(row);
     }
 }
 
-const collisionInterval = setInterval(checkCollision, 10);
+function handleClick(cell, x, y) {
+    if (isGameOver || cell.classList.contains('revealed')) return;
+
+    if (cell.getAttribute('data-mine') === 'mine') {
+        gameOver(cell);
+    } else {
+        revealCell(cell, x, y);
+        checkWin();
+    }
+}
+
+function revealCell(cell, x, y) {
+    if (cell.classList.contains('revealed')) return;
+
+    cell.classList.add('revealed');
+
+    const mineCount = countMinesAround(x, y);
+    if (mineCount > 0) {
+        cell.textContent = mineCount;
+    } else {
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
+                    revealCell(grid[nx][ny], nx, ny);
+                }
+            }
+        }
+    }
+}
+
+function countMinesAround(x, y) {
+    let count = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
+                if (grid[nx][ny].getAttribute('data-mine') === 'mine') {
+                    count++;
+                }
+            }
+        }
+    }
+    return count;
+}
+
+function gameOver(cell) {
+    isGameOver = true;
+    cell.classList.add('mine');
+    message.textContent = 'Game Over!';
+
+    grid.forEach(row => {
+        row.forEach(cell => {
+            if (cell.getAttribute('data-mine') === 'mine') {
+                cell.classList.add('mine');
+            }
+        });
+    });
+}
+
+function checkWin() {
+    let revealedCount = 0;
+    grid.forEach(row => {
+        row.forEach(cell => {
+            if (cell.classList.contains('revealed')) {
+                revealedCount++;
+            }
+        });
+    });
+
+    if (revealedCount === size * size - mineCount) {
+        message.textContent = 'You Win!';
+        isGameOver = true;
+    }
+}
+
+restartButton.addEventListener('click', createBoard);
+
+createBoard();
